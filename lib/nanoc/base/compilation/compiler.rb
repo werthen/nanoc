@@ -71,23 +71,58 @@ module Nanoc::Int
       @stack = []
     end
 
+    def log_time(msg)
+      # TODO: only verbose
+      
+      raise ArgumentError unless block_given?
+
+      before = Time.now
+      puts "-> #{msg}…"
+
+      yield
+
+      after = Time.now
+      duration = after - before
+      puts "-> #{msg}: done [#{format '%3.2f', duration}s]"
+    end
+
     def run_all
-      @action_provider.preprocess(@site)
-      build_reps
+      log_time 'Preprocessing' do
+        @action_provider.preprocess(@site)
+      end
+
+      log_time 'Building reps' do
+        build_reps
+      end
+
       run
-      @action_provider.postprocess(@site, @reps)
+
+      log_time 'Postprocessing' do
+        @action_provider.postprocess(@site, @reps)
+      end
     end
 
     def run
-      load_stores
-      @site.freeze
+      log_time 'Loading stores' do
+        load_stores
+      end
 
-      # Determine which reps need to be recompiled
-      forget_dependencies_if_outdated
+      log_time 'Freezing' do
+        @site.freeze
+      end
 
-      @stack = []
-      compile_reps
-      store
+      log_time 'Unsetting dependencies for outdated items' do
+        forget_dependencies_if_outdated
+      end
+
+      log_time 'Compiling' do
+        @stack = []
+        compile_reps
+      end
+
+      log_time 'Storing caches' do
+        store
+      end
     ensure
       Nanoc::Int::TempFilenameFactory.instance.cleanup(
         Nanoc::Filter::TMP_BINARY_ITEMS_DIR,
